@@ -40,6 +40,8 @@ def get_dataloaders(
         dict[str, tdata.DataLoader]: A dictionary containing the dataloaders.
     """
 
+    print(f"Creating all dataloaders for the {which_split} split...")
+
     assert 0 <= fraction_valid < 1, "fraction_valid must be in [0, 1)"
     modalities = [modalities] if isinstance(modalities, str) else modalities
 
@@ -51,7 +53,7 @@ def get_dataloaders(
     # For efficient data loading
     dataloaders_kwargs = {
         "batch_size": batch_size,
-        "pin_memory": True,
+        "pin_memory": False,
         "num_workers": num_workers,
         "persistent_workers": False,
         "prefetch_factor": 2,
