@@ -51,10 +51,10 @@ def create_raster_mask(json_path: Path, out_fp: Path, nodata_value: int = 6):
         _mask = mask_for_polygon(poly)
         mask[_mask > 0] = DAMAGE_DICT[subtype]
 
-    # Add nodata based on images (eg if the original image is cut)
+    # Add nodata based on xBD images (eg if the original image is cut)
     uid = out_fp.stem.split("_mask")[0]
-    fp_pre = XBD_S12_PATH / "xbd" / f"{uid}_pre_disaster.tif"
-    fp_post = XBD_S12_PATH / "xbd" / f"{uid}_post_disaster.tif"
+    fp_pre = XBD_S12_PATH / "xbd" / f"{uid}_pre_disaster.vrt"
+    fp_post = XBD_S12_PATH / "xbd" / f"{uid}_post_disaster.vrt"
     img_pre = rxr.open_rasterio(fp_pre)
     img_post = rxr.open_rasterio(fp_post)
 

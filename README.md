@@ -19,7 +19,7 @@ uv pip install -r requirements.txt
 
 ## Dataset
 
-The original xBD VHR images and labels cannot be redistributed here due to licensing restrictions. Please download them directly from [xView2](https://xview2.org/) by following their instructions. Place the resulting `.tar.gz` file in `data/`, e.g. in `data/original_xbd` folder, and extract it there. The expected structure after extraction should be:
+The original xBD VHR images and labels cannot be redistributed here due to licensing restrictions. Please download them directly from [xView2](https://xview2.org/) by following their instructions. Place the resulting, extracted dataset in the `data/` folder, e.g. in `data/original_xbd` folder. The expected structure after extraction should be:
 
 ```
 data/
@@ -56,7 +56,7 @@ python src/data/create_aligned_vrt.py --original_xbd_path="data/original_xbd" --
 3. Create the masks from the original xBD labels and store them under `data/xbd_s12/masks/`.
 
 ```bash
-python src/data/create_masks.py
+python src/data/create_masks.py --original_xbd_path='data/original_xbd'
 ```
 
 
