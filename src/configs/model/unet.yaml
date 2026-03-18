@@ -1,0 +1,11 @@
+name: unet
+add_skip_connection: false # Whether to add skip connection from input to final block
+input_type: "stacked"
+
+# standard UNet parameters from SMP
+encoder_name: resnet34
+encoder_weights: imagenet
+encoder_depth: 3
+decoder_use_norm: false # can be batchnorm for instance
+decoder_channels: [256, 128, 64, 32, 16]
+decoder_attention_type: null

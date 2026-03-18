@@ -1,0 +1,66 @@
+# @package _global_
+defaults:
+  - model: siamese
+
+run_name: ???
+task: multiclass # "multiclass" or "localization"
+extra_buffer_for_evaluation: null # e.g., 2 or [1,2,3]
+num_workers: 8
+debug: false
+seed: 42
+
+training:
+  max_epochs: 40
+  batch_size: 8
+  early_stopping: null
+  lr: 0.0005
+  weight_decay: 0.0001
+  use_transforms: true
+  sampler_train: weighted # "weighted" or null
+
+scheduler:
+  name: cosine_with_warmup
+  warmup_epochs: 3
+  total_epochs: ${training.max_epochs}
+
+loss:
+  name: ce
+  ignore_index: 99
+  reduction: mean
+
+data:
+  which_split: event # choose between xview2 (the original split) or event (new split by events from Hafner et al. 2025)
+  modalities:
+    - s1
+    - s2
+  s2_bands: all
+  s1_bands: all
+  disaster_train: null
+  disaster_test: null
+  downsample_factor: 8 # Always 8 to downsample the origial mask (1024x1024) to 128x128
+  use_simplified_classes: true
+  hdf5_path: default # use "default" to get the default path set in constants.py
+  remove_tiles_without_buildings: false
+  only_pre_disaster: false
+  normalize_data: true
+  fraction_valid: 0.15
+  pixels_buffer_around_buildings: 3
+
+# Logging
+logger: wandb
+wandb_project: xbd-s12
+wandb_tags: null
+plot_per_train: null
+plot_per_valid: 3
+plot_per_test: 5
+
+
+
+# Hydra config overrides:
+hydra:
+  run:
+    dir: logs/${run_name}
+  sweep:
+    dir: logs/${run_name}
+  job_logging:
+    root: null # (prevent ot automatically write a file .log)

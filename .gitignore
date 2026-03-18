@@ -1,0 +1,56 @@
+# Ignore Python cache & virtual envs
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.env
+xbd_sentinel_env/
+
+# Ignore logs & temp files
+*.log
+*.tmp
+*.out
+
+# Ignore large files & datasets
+data
+!src/data
+out
+out_legacy
+DOFA
+AnySat
+/data/
+/datasets/
+/out/
+/logs/
+/wandb/
+/out_legacy/
+/DOFA/
+DOFA/
+/AnySat/
+AnySat/
+*.pt
+.ipynb_checkpoints
+*egg-info
+
+# Ignore common large or raw file types
+*.csv
+*.json
+*.zip
+*.h5
+*.pth
+*.ckpt
+*.png
+*.tif
+*.jpg
+*.jpeg
+
+# Ignore IDE & OS-specific files
+.DS_Store
+.vscode/
+.idea/
+
+# virtual environment
+xbds12-env
+
+# Misc
+.s5cfg
