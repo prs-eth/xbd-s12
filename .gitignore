@@ -2,38 +2,24 @@
 __pycache__/
 *.pyc
 *.pyo
-venv/
-.env
-xbd_sentinel_env/
+xbds12-env
 
 # Ignore logs & temp files
 *.log
 *.tmp
 *.out
 
-# Ignore large files & datasets
+# Ignore data
 data/*
 !data/.gitkeep
 !src/data
-out
-out_legacy
-DOFA
-AnySat
-/data/
-/datasets/
-/out/
-/logs/
-/wandb/
-/out_legacy/
-/DOFA/
-DOFA/
-/AnySat/
-AnySat/
-*.pt
-.ipynb_checkpoints
-*egg-info
+
+# Ignore logs
+logs/
+
 
 # Ignore common large or raw file types
+.ipynb_checkpoints
 *.csv
 *.json
 *.zip
@@ -44,6 +30,8 @@ AnySat/
 *.tif
 *.jpg
 *.jpeg
+*.pt
+*egg-info
 
 # Ignore IDE & OS-specific files
 .DS_Store
@@ -51,7 +39,3 @@ AnySat/
 .idea/
 
 # virtual environment
-xbds12-env
-
-# Misc
-.s5cfg
