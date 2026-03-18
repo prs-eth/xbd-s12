@@ -9,6 +9,7 @@ from torchgeo.datasets.utils import _dict_list_to_list_dict
 
 def downsample_categorical_mask(mask: torch.Tensor, factor: int, n_labels: int) -> torch.Tensor:
     """Downsample a mask by a factor. Must be a perfect divisor of the mask size otherwise we lose information"""
+    print(f"Downsampling mask from {mask.shape} to {(mask.shape[0]//factor, mask.shape[1]//factor)}" )
     mask_1h = F.one_hot(mask, num_classes=n_labels).permute(2, 0, 1).float()
     mask_down = F.avg_pool2d(mask_1h.unsqueeze(0), kernel_size=factor, stride=factor)
     return mask_down.squeeze(0).argmax(0).long()  # (W//factor, H//factor)

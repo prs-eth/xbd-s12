@@ -211,7 +211,7 @@ class xBDS12Dataset(tdata.Dataset):
 
     def __del__(self):
         """Properly close HDF5 file when worker is destroyed."""
-        if self.use_hdf5 and self.hdf5_file is not None:
+        if self.use_hdf5 and hasattr(self, 'hdf5_file') and self.hdf5_file is not None:
             self.hdf5_file.close()
             self.hdf5_file = None
 
@@ -316,7 +316,7 @@ class xBDS12Dataset(tdata.Dataset):
                 x[f"xbd_{period}"] = xbd
 
         # Read labels
-        y = torch.from_numpy(hdf5_file["mask"][hdf5_idx]).long()
+        y = torch.from_numpy(hdf5_file["mask"][hdf5_idx]).long().squeeze()  # (H, W)
 
         return x, y
 
@@ -354,7 +354,7 @@ class xBDS12Dataset(tdata.Dataset):
 
         # Read labels
         fp_mask = self.DEFAULT_DATASET_FOLDER / "masks" / f"{uid}_mask.tif"
-        y = torch.from_numpy(rxr.open_rasterio(fp_mask).values).long()
+        y = torch.from_numpy(rxr.open_rasterio(fp_mask).values).long().squeeze()  # (H, W)
 
         return x, y
 
@@ -480,7 +480,7 @@ class xBDS12Dataset(tdata.Dataset):
 
     def unnormalize(self, x: dict) -> dict:
         """
-        Unnormalize the data (inverse of normalize function). (for plotting purposes)
+        Unnormalize the data (inverse of self.normalize function). (eg for debugging).
 
         Args:
             x (dict): dict with the normalized data (eg {"s2_pre": tensor, "s1_post": tensor, ...})
@@ -536,10 +536,6 @@ class xBDS12Dataset(tdata.Dataset):
             mpl.figure.Figure: The figure object containing the plots.
         """
 
-        # Unnormalize images for plotting
-        if self.normalize_data:
-            sample["images"] = self.unnormalize(sample["images"])
-
         n_imgs = self._get_n_imgs(add_predictions="predictions" in sample)
 
         if axs is None:
@@ -562,8 +558,8 @@ class xBDS12Dataset(tdata.Dataset):
                 if add_titles:
                     axs[i].set_title(f"{modality} ({self.s1_bands[-1]})")
             elif modality.startswith("s2_tci") or modality.startswith("xbd"):
-                # rgb image
-                img_to_plot = img.permute(1, 2, 0).int()
+                # unnormalize and to RGB 
+                img_to_plot = img.add(1.0).mul(127.5).permute(1, 2, 0).int()
                 axs[i].imshow(img_to_plot)
                 if add_titles:
                     axs[i].set_title(f"{modality}")
