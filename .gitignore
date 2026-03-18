@@ -12,7 +12,7 @@ xbd_sentinel_env/
 *.out
 
 # Ignore large files & datasets
-data
+data/*
 !data/.gitkeep
 !src/data
 out
