@@ -22,6 +22,8 @@ def get_dataloaders(
     """
     Create dataloaders for training, validation and testing.
 
+    See `xBDS12Dataset` for more details on the dataset and the available options.
+
     Args:
         modalities (str | list): The modalities to use. Defaults to ["s1", "s2"].
         task (str): The task to perform, either localization or multiclass. Defaults to "multiclass".
@@ -29,9 +31,10 @@ def get_dataloaders(
         batch_size (int): The batch size. Defaults to 8.
         num_workers (int): The number of workers for data loading. Defaults to 8.
         fraction_valid (float): The fraction of data to use for validation. Defaults to 0.15.
-        sampler_train (str): The sampler to use for training. Defaults to None.
+        sampler_train (str): The sampler to use for training. Can be either 'weighted' or None.Defaults to None.
         use_transforms (bool): Whether to use data augmentation transforms. Defaults to True.
         pixels_buffer_around_buildings (int): The number of pixels to buffer around buildings for training augmentation. Defaults to 3.
+        **kwargs: Additional arguments to pass to the dataset.
 
     Returns:
         dict[str, tdata.DataLoader]: A dictionary containing the dataloaders.
@@ -43,7 +46,6 @@ def get_dataloaders(
     print(f"Using modalities: {modalities}")
 
     # For efficient data loading
-    # num_workers = min(int(os.cpu_count() * 0.75), 16)
     dataloaders_kwargs = {
         "batch_size": batch_size,
         "pin_memory": True,
@@ -56,12 +58,20 @@ def get_dataloaders(
     disaster_train = kwargs.pop("disaster_train", None)
     disaster_test = kwargs.pop("disaster_test", None)
 
+    # Transforms
+    if use_transforms:
+        # use our custom augmentation (random flips and rotations)
+        transforms = RandomFlipRotate90()
+    else:
+        transforms = None
+
+    # Create datasets and dataloaders
     ds_train = xBDS12Dataset(
         split="train",
         which_split=which_split,
         modalities=modalities,
         disasters=disaster_train,
-        transforms=RandomFlipRotate90() if use_transforms else None,  # use our custom augmentation if requested
+        transforms=transforms,
         task=task,
         fraction_valid=fraction_valid,
         pixels_buffer_around_buildings=pixels_buffer_around_buildings,  # buffer for training
@@ -78,7 +88,7 @@ def get_dataloaders(
         )
     else:
         assert sampler_train is None, "sampler_train must be either 'weighted' or None"
-        train_loader = tdata.DataLoader(ds_train, shuffle=True, **dataloaders_kwargs)
+        train_loader = tdata.DataLoader(ds_train, shuffle=True, drop_last=True, **dataloaders_kwargs)
 
     if fraction_valid > 0:
         ds_valid = xBDS12Dataset(
@@ -104,7 +114,7 @@ def get_dataloaders(
             disasters=disaster_test,
             transforms=None,  # no augmentation for testing
             task=task,
-            pixels_buffer_around_buildings=0,
+            pixels_buffer_around_buildings=0,  # no buffer for testing
             **kwargs,
         )
         test_loader = tdata.DataLoader(ds_test, shuffle=False, **dataloaders_kwargs)

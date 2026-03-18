@@ -2,7 +2,7 @@ import json
 
 import torch.utils.data as tdata
 
-from src.constants import PROCESSED_PATH
+from src.constants import XBD_S12_PATH
 
 
 def get_weighted_sampler(ds: tdata.Dataset) -> tdata.WeightedRandomSampler:
@@ -26,7 +26,7 @@ def get_weighted_sampler(ds: tdata.Dataset) -> tdata.WeightedRandomSampler:
 def get_training_weights(which_split: str) -> dict:
     """Load or compute weights for each xbd_uid for the given split."""
 
-    weights_fp = PROCESSED_PATH / "labels_weights_training_set" / f"uid_weights_{which_split}_split.json"
+    weights_fp = XBD_S12_PATH / "stats" / f"uid_weights_{which_split}_split.json"
     if not weights_fp.exists():
         raise FileNotFoundError(f"Weights file not found: {weights_fp}. Please make sure they exist.")
 

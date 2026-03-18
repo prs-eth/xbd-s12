@@ -180,8 +180,8 @@ class xBDS12Dataset(tdata.Dataset):
             # Check that the metadata and stats files exists (should still be in the DEFAULT_DATASET_FOLDER)
             if not (self.DEFAULT_DATASET_FOLDER / "metadata.geojson").exists():
                 raise FileNotFoundError(f"Metadata file not found in {self.DEFAULT_DATASET_FOLDER / 'metadata.geojson'}.")
-            if not (self.DEFAULT_DATASET_FOLDER / "stats.json").exists():
-                raise FileNotFoundError(f"Stats file not found in {self.DEFAULT_DATASET_FOLDER / 'stats.json'}.")
+            if not (self.DEFAULT_DATASET_FOLDER / "stats").exists():
+                raise FileNotFoundError(f"Stats folder not found in {self.DEFAULT_DATASET_FOLDER / 'stats'}.")
 
         # Load metadata
         self.meta = self._load_metadata()
@@ -211,7 +211,7 @@ class xBDS12Dataset(tdata.Dataset):
 
     def __del__(self):
         """Properly close HDF5 file when worker is destroyed."""
-        if self.use_hdf5 and hasattr(self, 'hdf5_file') and self.hdf5_file is not None:
+        if self.use_hdf5 and hasattr(self, "hdf5_file") and self.hdf5_file is not None:
             self.hdf5_file.close()
             self.hdf5_file = None
 
@@ -428,8 +428,8 @@ class xBDS12Dataset(tdata.Dataset):
 
     def _load_precomputed_stats(self):
         """Load precomputed statistics for normalization (for the correct bands)."""
-        fp_stats = self.DEFAULT_DATASET_FOLDER / "stats.json"
-        assert fp_stats.exists(), f"Stats file {fp_stats} does not exist"
+        fp_stats = self.DEFAULT_DATASET_FOLDER / "stats" / "normalization.json"
+        assert fp_stats.exists(), f"Normalization file {fp_stats} does not exist"
         with open(fp_stats, "r") as f:
             stats = json.load(f)
 
@@ -558,7 +558,7 @@ class xBDS12Dataset(tdata.Dataset):
                 if add_titles:
                     axs[i].set_title(f"{modality} ({self.s1_bands[-1]})")
             elif modality.startswith("s2_tci") or modality.startswith("xbd"):
-                # unnormalize and to RGB 
+                # unnormalize and to RGB
                 img_to_plot = img.add(1.0).mul(127.5).permute(1, 2, 0).int()
                 axs[i].imshow(img_to_plot)
                 if add_titles:
