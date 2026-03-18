@@ -9,12 +9,13 @@ import rioxarray as rxr
 import cv2
 from tqdm import tqdm
 
+# Mapping from original class names to integer labels
 DAMAGE_DICT = {
     "no-damage": 1,
     "minor-damage": 2,
     "major-damage": 3,
     "destroyed": 4,
-    "un-classified": 5,  # eg under clouds
+    "un-classified": 5,  # eg under clouds, or new buildings in post-disaster image
 }
 
 

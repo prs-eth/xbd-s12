@@ -1,4 +1,4 @@
-"""
+hi"""
 This script corrects xBD raster metadata (CRS and Geotransform) by creating
 lightweight .vrt files. These VRTs point to the original .tif files but
 contain the correct UTM projections and bounds based on the metadata files.

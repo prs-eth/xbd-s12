@@ -8,13 +8,14 @@ import h5py
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import pandas as pd
+import rioxarray as rxr
 import torch
 import torch.nn.functional as F
 import torchvision
 from sklearn.model_selection import train_test_split
 from torch.utils import data as tdata
 
-from src.constants import ALL_DISASTERS, S1_BANDS, S2_BANDS
+from src.constants import ALL_DISASTERS, S1_BANDS, S2_BANDS, XBD_S12_PATH, TRAIN_DISASTERS, TEST_DISASTERS
 from src.training.utils import apply_buffer_around_buildings, downsample_categorical_mask
 from src.visualization import plot_mask
 
@@ -23,8 +24,7 @@ class xBDS12Dataset(tdata.Dataset):
 
     N_LABELS = 7  # background, intact, minor, major, destroyed, unclassified, no-data
     MODALITIES = ["s1", "s2", "s2_tci", "xbd"]
-    ORIGINAL_HDF5_PATH = Path("/scratch4/odietrich/git/xBD_Sentinel/data/ready/xbd_sentinel_v2.h5")
-    # ORIGINAL_HDF5_PATH = Path("/scratch/lscheibenreif/data/xbd_sentinel_v2.h5")
+    DEFAULT_DATASET_FOLDER = XBD_S12_PATH  # change if data is stored elsewhere
 
     def __init__(
         self,
@@ -39,14 +39,15 @@ class xBDS12Dataset(tdata.Dataset):
         transforms: torchvision.transforms.Compose = None,
         task: str = "multiclass",  # either 'multiclass' or 'localization'
         use_simplified_classes: bool = True,
-        hdf5_path: str = "default",
+        use_hdf5: bool = False,
+        hdf5_path: str = None,
         return_meta: bool = True,
         remove_tiles_without_buildings: bool = False,
         only_pre_disaster: bool = False,
         normalize_data: bool = True,
         fraction_valid: float = 0.15,
         pixels_buffer_around_buildings: int = 3,
-        verbose: int = 1,
+        verbose: bool = True,
         seed: int = 42,
     ):
         """
@@ -55,32 +56,34 @@ class xBDS12Dataset(tdata.Dataset):
         Args:
             split (str): Which split between train, valid or test or None. Defaults to "train".
             which_split (str): Which split to use, "xview2" (for original xBD), "event" (from Hafner et al., 2025), or "full" (all disasters).
-                Note: which_split=full is equivalent ot split=None... Defaults to "event".
-            modalities (list): Which modalities to include, must be a subset of self.MODALITIES.
-                Defaults to ["s1", "s2", "xbd"].
-            s2_bands (Union[str, list]): Which Sentinel-2 bands to use, "all" for all 12 bands, "rgb" for B4,B3,B2,
-                or a list of band names (e.g. ["b4", "b3", "b2"]). Defaults to "all".
-            s1_bands (Union[str, list]): Which Sentinel-1 bands to use, "all" for VV and VH, or a list of band names
-                (e.g. ["vv"]). Defaults to "all".
+                Note: which_split=full is equivalent to split=None. Defaults to "event".
+            modalities (list): Which modalities to include, must be a subset of self.MODALITIES. Defaults to ["s1", "s2"].
+            s2_bands (str | list): Which Sentinel-2 bands to use, "all" for all 12 bands, "rgb" for B4,B3,B2,
+                or a list of band names (e.g. ["B4", "B3", "B2"]). Defaults to "all".
+            s1_bands (str | list): Which Sentinel-1 bands to use, "all" for VV and VH, or a list of band names
+                (e.g. ["VV"]). Defaults to "all".
             disasters (list): Which disasters to include, must be a subset of ALL_DISASTERS. If None, all disasters are included.
-            downsample_factor (Union[int, str]): Downsample factor applied to mask (and xBD if downsample_xbd is true)
-                If modalities contains s1 or s2, the downsampling factor must be 8.
+            downsample_factor (int | str): Downsample factor applied to mask (and xBD if downsample_xbd is true)
+                If modalities contains s1 or s2, the downsampling factor must be 8. Defaults to 8.
             downsample_xbd (bool): Whether to downsample xBD images by the downsample_factor. Defaults to False.
             transforms (torchvision.transforms.Compose): Transforms to apply to the data. Defaults to None.
             task (str): Either 'multiclass' for damage classification, or 'localization' for building localization.
                 If multiclass, the labels are either 0-2 (if use_simplified_classes is True) or 0-4.
                 If localization, the labels are 0 (background) and 1 (building).
-                In both case, pixels that are 99 should be ignored. Defaults to 'multiclass'.
+                In both case, pixels that are 99 should be ignored.
+                Defaults to 'multiclass'.
             use_simplified_classes (bool): Whether to use simplified damage classes (Background, Intact, Damaged) or the original ones.
-            add_original_labels (bool): Whether to add the original xBD labels (0-4) as additional labels in the sample as 'original_labels'.
-            hdf5_path (str): Path to the HDF5 file. If not given, will be by default self.ORIGINAL_HDF5_PATH. Defaults to None.
+            use_hdf5 (bool): Whether to read data from a HDF5 file. If True, hdf5_path must be provided. If False, data will be read from
+                the default location (data/xbd_12). Defaults to False.
+            hdf5_path (str): Path to the HDF5 file. Must be provided if use_hdf5 is True. Defaults to None.
             return_meta (bool): Whether to return metadata with the sample. Defaults to True.
             remove_tiles_without_buildings (bool): Whether to remove tiles without buildings. Defaults to False.
-            only_pre_disaster (bool): Whether to only include pre-disaster images. Defaults to False.
+            only_pre_disaster (bool): Whether to only include pre-disaster images. This can only be used when task is 'localization'.
+                Defaults to False.
             normalize_data (bool): Whether to normalize the data with precomputed stats. Defaults to True.
             fraction_valid (float): Fraction of the training set to use for validation. Defaults to 0.15.
             pixels_buffer_around_buildings (int): Number of pixels to add as buffer around buildings in the mask. Defaults to 3.
-            verbose (int): Verbosity level. Defaults to 1.
+            verbose (bool): Verbosity. Defaults to True.
             seed (int): Seed for reproducibility. Defaults to 42.
         """
 
@@ -110,9 +113,11 @@ class xBDS12Dataset(tdata.Dataset):
         if downsample_xbd and downsample_factor is None:
             print("Warning: downsample_xbd is True but downsample_factor is None, nothing will be done")
         assert task in ["multiclass", "localization"], f"Invalid task {task}"
-        hdf5_path = Path(hdf5_path) if hdf5_path != "default" else self.ORIGINAL_HDF5_PATH
-        if not hdf5_path.exists():
-            raise FileNotFoundError(f"HDF5 file {hdf5_path} does not exist")
+        if use_hdf5:
+            assert hdf5_path is not None, "If use_hdf5 is True, hdf5_path must be provided"
+            hdf5_path = Path(hdf5_path)
+            if not hdf5_path.exists():
+                raise FileNotFoundError(f"HDF5 file {hdf5_path} does not exist")
         assert 0 <= fraction_valid <= 1, "fraction_valid must be between 0 and 1"
         assert not (split == "valid" and fraction_valid == 0), "If split is 'valid', fraction_valid must be > 0"
         if only_pre_disaster:
@@ -130,6 +135,7 @@ class xBDS12Dataset(tdata.Dataset):
         self.transforms = transforms
         self.task = task
         self.use_simplified_classes = use_simplified_classes
+        self.use_hdf5 = use_hdf5
         self.hdf5_path = hdf5_path
         self.return_meta = return_meta
         self.remove_tiles_without_buildings = remove_tiles_without_buildings
@@ -151,22 +157,44 @@ class xBDS12Dataset(tdata.Dataset):
             # Columns to return as metadata, for the moment keep it minimal
             self.col_to_return = ["xbd_uid", "disaster"]
 
-        # Check that metadata and stats exists (should be in a folder with same name as hdf5 file)
-        self.aux_folder = Path(str(self.hdf5_path).replace(".h5", ""))  # stats and metadata in folder with same name as hdf5
-        assert (self.aux_folder / "metadata.geojson").exists(), f"Metadata file {self.aux_folder / 'metadata.geojson'} does not exist"
-        assert (self.aux_folder / "stats.json").exists(), f"Stats file {self.aux_folder / 'stats.json'} does not exist"
+        # Check that data and metadata exist
+        if not self.use_hdf5:
+            instr = "Please run the data preparation steps in the README first."
+            # Check that the dataset folder exists (if it does, then we assume metadata and stats are there, as they
+            # come from the Zenodo archive directly)
+            if not self.DEFAULT_DATASET_FOLDER.exists():
+                raise FileNotFoundError(f"Dataset {self.DEFAULT_DATASET_FOLDER} does not exist. {instr}")
+            # Check that the masks have been created
+            if not (self.DEFAULT_DATASET_FOLDER / "masks").exists():
+                raise FileNotFoundError(f"Masks haven't been created in {self.DEFAULT_DATASET_FOLDER / 'masks'}. {instr}")
+            # Check that the xbd images (the corrected ones) have been created
+            if self.use_xbd:
+                if not (self.DEFAULT_DATASET_FOLDER / "xbd").exists():
+                    raise FileNotFoundError(f"Corrected xBD images not found in {self.DEFAULT_DATASET_FOLDER / 'xbd'}. {instr}")
+        else:
+            # Check that HDF5 file exists
+            if not self.hdf5_path.exists():
+                raise FileNotFoundError(
+                    f"HDF5 file {self.hdf5_path} does not exist. Please run the data preparation steps in the README to create it first."
+                )
+            # Check that the metadata and stats files exists (should still be in the DEFAULT_DATASET_FOLDER)
+            if not (self.DEFAULT_DATASET_FOLDER / "metadata.geojson").exists():
+                raise FileNotFoundError(f"Metadata file not found in {self.DEFAULT_DATASET_FOLDER / 'metadata.geojson'}.")
+            if not (self.DEFAULT_DATASET_FOLDER / "stats.json").exists():
+                raise FileNotFoundError(f"Stats file not found in {self.DEFAULT_DATASET_FOLDER / 'stats.json'}.")
 
         # Load metadata
-        self.meta = self.load_metadata()
+        self.meta = self._load_metadata()
         if self.verbose:
             print(f'Using the "{which_split}" split')
-            print(f"Loaded {len(self.meta)} samples for {self.split} from {self.hdf5_path}")
+            print(f"Loaded {len(self.meta)} samples for {self.split}")
 
         # Load precomputed statistics for normalization
         if self.normalize_data:
-            self.load_precomputed_stats()
+            self._load_precomputed_stats()
 
-        self.hdf5_file = None  # Will be opened per-worker
+        if self.use_hdf5:
+            self.hdf5_file = None  # Will be opened per-worker
 
     def _get_hdf5_file(self):
         """Open HDF5 file lazily per worker process."""
@@ -183,7 +211,7 @@ class xBDS12Dataset(tdata.Dataset):
 
     def __del__(self):
         """Properly close HDF5 file when worker is destroyed."""
-        if self.hdf5_file is not None:
+        if self.use_hdf5 and self.hdf5_file is not None:
             self.hdf5_file.close()
             self.hdf5_file = None
 
@@ -209,7 +237,7 @@ class xBDS12Dataset(tdata.Dataset):
 
     def get_sample_from_row(self, row: pd.Series) -> dict:
         """
-        Read data and labels for a given row in the metadata
+        Read data and labels for a given row in the metadata dataframe.
 
         Args:
             row (pd.Series): Row from the metadata dataframe.
@@ -220,6 +248,43 @@ class xBDS12Dataset(tdata.Dataset):
                 - labels: torch tensor with the labels (HxW with values in 0-2 or 0-4 (99 for nodata))
                 - meta): metadata as a dictionary
         """
+        if self.use_hdf5:
+            x, y = self.get_sample_from_hdf5(row)
+        else:
+            x, y = self.get_sample_from_files(row)
+
+        # Normalize data
+        if self.normalize_data:
+            x = self.normalize(x)
+
+        # Process labels
+        if self.task == "localization":
+            y[(y > 0) & (y < 5)] = 1  # all buildings to 1
+        elif self.use_simplified_classes:
+            # merge minor, major, destroyed into 1 class
+            y[(y == 3) | (y == 4)] = 2
+        if self.downsample_factor is not None and self.downsample_factor > 1:
+            y = downsample_categorical_mask(y, self.downsample_factor, self.N_LABELS)
+        if self.pixels_buffer_around_buildings > 0:
+            y = apply_buffer_around_buildings(y, buffer=self.pixels_buffer_around_buildings)
+        y[(y == 5) | (y == 6)] = 99  # unclassified and no-data to 99 (always)
+
+        # Apply transforms
+        if self.transforms is not None:
+            # Assume it is our custom transform function that takes as inputs a list of images of arbitrary size
+            imgs = list(x.values()) + [y]
+            imgs_transformed = self.transforms(*imgs)
+            x = {k: v for k, v in zip(x.keys(), imgs_transformed[:-1])}
+            y = imgs_transformed[-1]
+
+        # Store everything in a dict and return
+        sample = {"images": x, "labels": y}
+        if self.return_meta:
+            sample["meta"] = row[self.col_to_return].to_dict()
+        return sample
+
+    def get_sample_from_hdf5(self, row: pd.Series) -> tuple:
+        """Read data directly from the HDF5 file."""
 
         hdf5_file = self._get_hdf5_file()
         hdf5_idx = row.hdf5_idx  # get the index to read in hdf5
@@ -250,62 +315,77 @@ class xBDS12Dataset(tdata.Dataset):
                     xbd = F.interpolate(xbd.unsqueeze(0), scale_factor=1 / self.downsample_factor, mode="bilinear").squeeze(0)
                 x[f"xbd_{period}"] = xbd
 
-        # Normalize data
-        if self.normalize_data:
-            x = self.normalize(x)
-
-        # Read labels (HxW raster with values in 0-6: background, intact, minor, major, destroyed, unclassified, no-data)
+        # Read labels
         y = torch.from_numpy(hdf5_file["mask"][hdf5_idx]).long()
 
-        # Process labels
-        if self.task == "localization":
-            y[(y > 0) & (y < 5)] = 1  # all buildings to 1
-        elif self.use_simplified_classes:
-            # merge minor, major, destroyed into 1 class
-            y[(y == 3) | (y == 4)] = 2
-        if self.downsample_factor is not None and self.downsample_factor > 1:
-            y = downsample_categorical_mask(y, self.downsample_factor, self.N_LABELS)
-        if self.pixels_buffer_around_buildings > 0:
-            y = apply_buffer_around_buildings(y, buffer=self.pixels_buffer_around_buildings)
-        y[(y == 5) | (y == 6)] = 99  # unclassified and no-data to 99 (always)
+        return x, y
 
-        # Apply transforms
-        if self.transforms is not None:
-            # Assume it is our custom transform function that takes as inputs a list of images of arbitrary size
-            imgs = list(x.values()) + [y]
-            imgs_transformed = self.transforms(*imgs)
-            x = {k: v for k, v in zip(x.keys(), imgs_transformed[:-1])}
-            y = imgs_transformed[-1]
+    def get_sample_from_files(self, row: pd.Series) -> tuple:
+        """Read data from the original files."""
+        uid = row.xbd_uid
+        x = {}
 
-        # Store everything in a dict and return
-        sample = {"images": x, "labels": y}
-        if self.return_meta:
-            sample["meta"] = row[self.col_to_return].to_dict()
-        return sample
+        for period in self.periods:
+            if self.use_s2:
+                fp_s2 = self.DEFAULT_DATASET_FOLDER / "s2" / f"{uid}_{period}_disaster_s2.tif"
+                s2 = torch.from_numpy(rxr.open_rasterio(fp_s2).values).float()
+                if len(self.s2_bands) < 12:
+                    s2 = s2[self.s2_bands_ids, :, :]
+                x[f"s2_{period}"] = s2
 
-    def load_metadata(self) -> gpd.GeoDataFrame:
+            if self.use_s1:
+                fp_s1 = self.DEFAULT_DATASET_FOLDER / "s1" / f"{uid}_{period}_disaster_s1.tif"
+                s1 = torch.from_numpy(rxr.open_rasterio(fp_s1).values).float()
+                if len(self.s1_bands) < 2:
+                    s1 = s1[self.s1_bands_ids, :, :]
+                x[f"s1_{period}"] = s1
+
+            if self.use_s2_tci:
+                fp_s2_tci = self.DEFAULT_DATASET_FOLDER / "s2_tci" / f"{uid}_{period}_disaster_s2_tci.tif"
+                s2_tci = torch.from_numpy(rxr.open_rasterio(fp_s2_tci).values).float()
+                x[f"s2_tci_{period}"] = s2_tci
+
+            if self.use_xbd:
+                fp_xbd = self.DEFAULT_DATASET_FOLDER / "xbd" / f"{uid}_{period}_disaster.vrt"
+                xbd = torch.from_numpy(rxr.open_rasterio(fp_xbd).values).float()
+                if self.downsample_xbd and self.downsample_factor is not None and self.downsample_factor > 1:
+                    xbd = F.interpolate(xbd.unsqueeze(0), scale_factor=1 / self.downsample_factor, mode="bilinear").squeeze(0)
+                x[f"xbd_{period}"] = xbd
+
+        # Read labels
+        fp_mask = self.DEFAULT_DATASET_FOLDER / "masks" / f"{uid}_mask.tif"
+        y = torch.from_numpy(rxr.open_rasterio(fp_mask).values).long()
+
+        return x, y
+
+    def _load_metadata(self) -> gpd.GeoDataFrame:
         """Load metadata from the geojson file."""
 
         # Load metadata
-        meta_fp = self.aux_folder / "metadata.geojson"
+        meta_fp = self.DEFAULT_DATASET_FOLDER / "xbd_s12_metadata.geojson"
         assert meta_fp.exists(), f"Metadata file {meta_fp} does not exist"
         meta = gpd.read_file(meta_fp)
 
         # keep track of original index to read correct row in hdf5
-        meta = meta.reset_index(drop=True).rename_axis("hdf5_idx").reset_index()  # create column hdf5_idx
+        if self.use_hdf5:
+            # create column hdf5_idx
+            meta = meta.reset_index(drop=True).rename_axis("hdf5_idx").reset_index()
 
-        # make sure date are not timestamp
+        # make sure date are not timestamp (TODO: why ?)
         col_dates = [c for c in meta.columns if "date" in c]
         for col in col_dates:
             # back to string
             meta[col] = meta[col].dt.strftime("%Y-%m-%d")
 
-        # Reorganize split if not using the event-based one:
+        # Create the split column based on which_split
         if self.which_split == "xview2":
-            # tier1, tier3 as training, test as testing, discard hold (as in Hafner et al)
-            meta.loc[meta.xbd_tier.isin(["tier1", "tier3"]), "split"] = "train"
+            # train, tier3 as training, test as testing, discard hold (as in Hafner et al)
+            meta.loc[meta.xbd_tier.isin(["train", "tier3"]), "split"] = "train"
             meta.loc[meta.xbd_tier == "test", "split"] = "test"
             meta = meta[meta.xbd_tier != "hold"].copy()
+        elif self.which_split == "event":
+            meta.loc[meta.disaster.isin(TRAIN_DISASTERS), "split"] = "train"
+            meta.loc[meta.disaster.isin(TEST_DISASTERS), "split"] = "test"
         else:
             pass
 
@@ -342,18 +422,19 @@ class xBDS12Dataset(tdata.Dataset):
         if self.remove_tiles_without_buildings:
             if self.verbose:
                 print("Removing tiles without buildings")
-            meta = meta[meta.building_count > 0]
+            meta = meta[meta.N_total > 0]
 
-        return meta
+        return meta.copy()
 
-    def load_precomputed_stats(self):
+    def _load_precomputed_stats(self):
         """Load precomputed statistics for normalization (for the correct bands)."""
-        fp_stats = self.aux_folder / "stats.json"
+        fp_stats = self.DEFAULT_DATASET_FOLDER / "stats.json"
         assert fp_stats.exists(), f"Stats file {fp_stats} does not exist"
         with open(fp_stats, "r") as f:
             stats = json.load(f)
 
         self.norm_params = {}
+        # Only s1 and s2, the others (s2_tci and xbd) are normalized differently (see normalize function)
         if self.use_s2:
             s2_min = torch.tensor(stats["s2"]["1st"], dtype=torch.float32)
             s2_max = torch.tensor(stats["s2"]["99th"], dtype=torch.float32)
@@ -397,8 +478,35 @@ class xBDS12Dataset(tdata.Dataset):
 
         return x
 
-    def get_n_imgs(self, add_predictions: bool = False) -> int:
-        """Get the number of images to plot per sample."""
+    def unnormalize(self, x: dict) -> dict:
+        """
+        Unnormalize the data (inverse of normalize function). (for plotting purposes)
+
+        Args:
+            x (dict): dict with the normalized data (eg {"s2_pre": tensor, "s1_post": tensor, ...})
+
+        Returns:
+            dict: unnormalized data
+        """
+        for k, v in x.items():
+            if k.startswith("s2_tci") or k.startswith("xbd"):
+                # RGB unnormalization: (x + 1) * 127.5
+                x[k] = v.add(1.0).mul(127.5)
+
+            elif k.startswith("s2"):
+                min_val = self.norm_params["s2_min"]
+                max_val = self.norm_params["s2_max"]
+                x[k] = v.mul(max_val - min_val).add(min_val)
+
+            elif k.startswith("s1"):
+                min_val = self.norm_params["s1_min"]
+                max_val = self.norm_params["s1_max"]
+                x[k] = v.mul(max_val - min_val).add(min_val)
+
+        return x
+
+    def _get_n_imgs(self, add_predictions: bool = False) -> int:
+        """Utils for plotting: get the number of images to plot per sample."""
         n_imgs = len(self.modalities) * len(self.periods) + 1  # +1 for the mask
         if add_predictions:
             n_imgs += 1  # +1 for the predictions
@@ -428,7 +536,11 @@ class xBDS12Dataset(tdata.Dataset):
             mpl.figure.Figure: The figure object containing the plots.
         """
 
-        n_imgs = self.get_n_imgs(add_predictions="predictions" in sample)
+        # Unnormalize images for plotting
+        if self.normalize_data:
+            sample["images"] = self.unnormalize(sample["images"])
+
+        n_imgs = self._get_n_imgs(add_predictions="predictions" in sample)
 
         if axs is None:
             fig, axs = plt.subplots(1, n_imgs, figsize=(3 * n_imgs, 3))
@@ -445,16 +557,13 @@ class xBDS12Dataset(tdata.Dataset):
             img = img.cpu()
 
             if modality.startswith("s1"):
-                # plot only the last band (almost always VV)
+                # plot only the last band (VV except if only VH was selected), in gray.
                 axs[i].imshow(img[-1], cmap="gray")
                 if add_titles:
                     axs[i].set_title(f"{modality} ({self.s1_bands[-1]})")
             elif modality.startswith("s2_tci") or modality.startswith("xbd"):
                 # rgb image
-                if self.normalize_data:
-                    img_to_plot = ((img.permute(1, 2, 0) + 1) * 127.5).int()
-                else:
-                    img_to_plot = img.permute(1, 2, 0).int()
+                img_to_plot = img.permute(1, 2, 0).int()
                 axs[i].imshow(img_to_plot)
                 if add_titles:
                     axs[i].set_title(f"{modality}")
@@ -477,7 +586,6 @@ class xBDS12Dataset(tdata.Dataset):
                     img_to_plot = img[0]
                     if add_titles:
                         axs[i].set_title(f"{modality} (band {self.s2_bands[0]})")
-                # not sure what to do with normalization
                 axs[i].imshow(img_to_plot)
 
         # Plot mask
