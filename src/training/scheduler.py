@@ -2,7 +2,7 @@ import torch
 from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
 
 
-def scheduler_factory(optimizer: torch.optim.Optimizer, scheduler_name: str, **scheduler_kwargs):
+def scheduler_factory(optimizer: torch.optim.Optimizer, scheduler_name: str | None, **scheduler_kwargs):
     """Create the learning rate scheduler from the config."""
 
     if scheduler_name == "cosine_with_warmup":
@@ -17,8 +17,8 @@ def scheduler_factory(optimizer: torch.optim.Optimizer, scheduler_name: str, **s
             eta_min=scheduler_kwargs.get("eta_min", 0),
         )
         print('Using "warmup_cosine" scheduler (Linear warmup + CosineAnnealingLR)')
-        print(f'with {warmup_steps} warmup steps ({scheduler_kwargs["warmup_epochs"]} epochs)')
-        print(f'and {total_steps} total steps ({scheduler_kwargs["total_epochs"]} epochs)')
+        print(f'with {total_steps} total steps ({scheduler_kwargs["total_epochs"]} epochs)')
+        print(f'including {warmup_steps} warmup steps ({scheduler_kwargs["warmup_epochs"]} epochs)')
     elif scheduler_name is None:
         scheduler = None
         print("No scheduler used.")

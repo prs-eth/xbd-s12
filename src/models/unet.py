@@ -108,7 +108,7 @@ class UNetWithInputSkip(nn.Module):
         self.activation = self._get_activation(activation)
 
         # Initialize weights of new layers
-        self.initialize()
+        self.initialize_weights()
 
     def _get_activation(self, activation):
         if activation is None or activation == "identity":
@@ -120,14 +120,14 @@ class UNetWithInputSkip(nn.Module):
         else:
             raise ValueError(f"Activation {activation} is not supported")
 
-    def initialize(self):
+    def initialize_weights(self):
         # Don't initialize the UNet, just the new layers
         if self.add_skip_connection:
             init_weights(self.skip_input)
         init_weights(self.final_block)
         init_weights(self.segmentation_head)
 
-    def forward(self, x, return_features=False):
+    def forward(self, x: torch.Tensor, return_features: bool = False) -> torch.Tensor:
         # Get U-Net features
         unet_output = self.unet(x)
 
@@ -140,6 +140,7 @@ class UNetWithInputSkip(nn.Module):
             combined = torch.cat([unet_output, x_skip], dim=1)
             features = self.final_block(combined)
         else:
+            # (SHOULD HAVE BEEN AVOIDED IF NO SKIP...)
             features = self.final_block(unet_output)
 
         if return_features:

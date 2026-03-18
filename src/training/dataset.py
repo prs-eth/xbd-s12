@@ -1,4 +1,4 @@
-"""the xBD-S12 dataset."""
+"""The xBD-S12 dataset."""
 
 import json
 from pathlib import Path
@@ -15,7 +15,7 @@ import torchvision
 from sklearn.model_selection import train_test_split
 from torch.utils import data as tdata
 
-from src.constants import ALL_DISASTERS, S1_BANDS, S2_BANDS, XBD_S12_PATH, TRAIN_DISASTERS, TEST_DISASTERS
+from src.constants import ALL_DISASTERS, S1_BANDS, S2_BANDS, TEST_DISASTERS, TRAIN_DISASTERS, XBD_S12_PATH
 from src.training.utils import apply_buffer_around_buildings, downsample_categorical_mask
 from src.visualization import plot_mask
 
@@ -31,22 +31,22 @@ class xBDS12Dataset(tdata.Dataset):
         split: str = "train",
         which_split: str = "event",
         modalities=["s1", "s2"],
+        disasters: str | list | None = None,
+        transforms: torchvision.transforms.Compose | None = None,
+        task: str = "multiclass",  # either 'multiclass' or 'localization'
+        fraction_valid: float = 0.15,
+        pixels_buffer_around_buildings: int = 3,
         s2_bands: str | list = "all",
         s1_bands: str | list = "all",
-        disasters: list = None,
         downsample_factor: int | str = 8,
         downsample_xbd: bool = False,
-        transforms: torchvision.transforms.Compose = None,
-        task: str = "multiclass",  # either 'multiclass' or 'localization'
         use_simplified_classes: bool = True,
         use_hdf5: bool = False,
-        hdf5_path: str = None,
+        hdf5_path: str | None = None,
         return_meta: bool = True,
         remove_tiles_without_buildings: bool = False,
         only_pre_disaster: bool = False,
         normalize_data: bool = True,
-        fraction_valid: float = 0.15,
-        pixels_buffer_around_buildings: int = 3,
         verbose: bool = True,
         seed: int = 42,
     ):
@@ -54,35 +54,35 @@ class xBDS12Dataset(tdata.Dataset):
         Initialize the xBD Sentinel dataset.
 
         Args:
-            split (str): Which split between train, valid or test or None. Defaults to "train".
+            split (str): Which split between train, valid or test. Defaults to "train".
             which_split (str): Which split to use, "xview2" (for original xBD), "event" (from Hafner et al., 2025), or "full" (all disasters).
-                Note: which_split=full is equivalent to split=None. Defaults to "event".
+                Note: which_split=full expects the split to be either 'train' or 'valid', not 'test'. Defaults to "event".
             modalities (list): Which modalities to include, must be a subset of self.MODALITIES. Defaults to ["s1", "s2"].
-            s2_bands (str | list): Which Sentinel-2 bands to use, "all" for all 12 bands, "rgb" for B4,B3,B2,
-                or a list of band names (e.g. ["B4", "B3", "B2"]). Defaults to "all".
-            s1_bands (str | list): Which Sentinel-1 bands to use, "all" for VV and VH, or a list of band names
-                (e.g. ["VV"]). Defaults to "all".
-            disasters (list): Which disasters to include, must be a subset of ALL_DISASTERS. If None, all disasters are included.
-            downsample_factor (int | str): Downsample factor applied to mask (and xBD if downsample_xbd is true)
-                If modalities contains s1 or s2, the downsampling factor must be 8. Defaults to 8.
-            downsample_xbd (bool): Whether to downsample xBD images by the downsample_factor. Defaults to False.
-            transforms (torchvision.transforms.Compose): Transforms to apply to the data. Defaults to None.
+            disasters (str | list | None): Which disasters to include, must be a subset of ALL_DISASTERS. If None, all disasters are included.
+            transforms (torchvision.transforms.Compose | None): Transforms to apply to the data. Defaults to None.
             task (str): Either 'multiclass' for damage classification, or 'localization' for building localization.
                 If multiclass, the labels are either 0-2 (if use_simplified_classes is True) or 0-4.
                 If localization, the labels are 0 (background) and 1 (building).
                 In both case, pixels that are 99 should be ignored.
                 Defaults to 'multiclass'.
+            fraction_valid (float): Fraction of the training set to use for validation. Defaults to 0.15.
+            pixels_buffer_around_buildings (int): Number of pixels to add as buffer around buildings in the mask. Defaults to 3.
+            s2_bands (str | list): Which Sentinel-2 bands to use, "all" for all 12 bands, "rgb" for B4,B3,B2,
+                or a list of band names (e.g. ["B4", "B3", "B2"]). Defaults to "all".
+            s1_bands (str | list): Which Sentinel-1 bands to use, "all" for VV and VH, or a list of band names
+                (e.g. ["VV"]). Defaults to "all".
+            downsample_factor (int | str): Downsample factor applied to mask (and xBD if downsample_xbd is true)
+                If modalities contains s1 or s2, the downsampling factor must be 8. Defaults to 8.
+            downsample_xbd (bool): Whether to downsample xBD images by the downsample_factor. Defaults to False.
             use_simplified_classes (bool): Whether to use simplified damage classes (Background, Intact, Damaged) or the original ones.
             use_hdf5 (bool): Whether to read data from a HDF5 file. If True, hdf5_path must be provided. If False, data will be read from
                 the default location (data/xbd_12). Defaults to False.
-            hdf5_path (str): Path to the HDF5 file. Must be provided if use_hdf5 is True. Defaults to None.
+            hdf5_path (str | None): Path to the HDF5 file. Must be provided if use_hdf5 is True. Defaults to None.
             return_meta (bool): Whether to return metadata with the sample. Defaults to True.
             remove_tiles_without_buildings (bool): Whether to remove tiles without buildings. Defaults to False.
             only_pre_disaster (bool): Whether to only include pre-disaster images. This can only be used when task is 'localization'.
                 Defaults to False.
             normalize_data (bool): Whether to normalize the data with precomputed stats. Defaults to True.
-            fraction_valid (float): Fraction of the training set to use for validation. Defaults to 0.15.
-            pixels_buffer_around_buildings (int): Number of pixels to add as buffer around buildings in the mask. Defaults to 3.
             verbose (bool): Verbosity. Defaults to True.
             seed (int): Seed for reproducibility. Defaults to 42.
         """
@@ -90,8 +90,10 @@ class xBDS12Dataset(tdata.Dataset):
         super().__init__()
 
         # Check input
-        assert split in ["train", "valid", "test", None], f"Invalid split {split}"
+        assert split in ["train", "valid", "test"], f"Invalid split {split}"
         assert which_split in ["xview2", "event", "full"], f"Invalid which_split {which_split}"
+        if which_split == "full":
+            assert split in ["train", "valid"], "which_split=full does not support split=test"
         assert all([m in self.MODALITIES for m in modalities]), f"Invalid modalities {modalities}, must be in {self.MODALITIES}"
         if s2_bands == "all":
             s2_bands = S2_BANDS
@@ -180,13 +182,12 @@ class xBDS12Dataset(tdata.Dataset):
             # Check that the metadata and stats files exists (should still be in the DEFAULT_DATASET_FOLDER)
             if not (self.DEFAULT_DATASET_FOLDER / "metadata.geojson").exists():
                 raise FileNotFoundError(f"Metadata file not found in {self.DEFAULT_DATASET_FOLDER / 'metadata.geojson'}.")
-            if not (self.DEFAULT_DATASET_FOLDER / "stats").exists():
-                raise FileNotFoundError(f"Stats folder not found in {self.DEFAULT_DATASET_FOLDER / 'stats'}.")
+            if not (self.DEFAULT_DATASET_FOLDER / "normalization.json").exists():
+                raise FileNotFoundError(f"Normalization file not found in {self.DEFAULT_DATASET_FOLDER / 'normalization.json'}.")
 
         # Load metadata
         self.meta = self._load_metadata()
         if self.verbose:
-            print(f'Using the "{which_split}" split')
             print(f"Loaded {len(self.meta)} samples for {self.split}")
 
         # Load precomputed statistics for normalization
@@ -215,7 +216,7 @@ class xBDS12Dataset(tdata.Dataset):
             self.hdf5_file.close()
             self.hdf5_file = None
 
-    def get_n_channels(self) -> int:
+    def get_in_channels(self) -> int:
         """Get the number of input channels based on the selected modalities and bands."""
         n_channels = 0
         if self.use_s2:
@@ -387,17 +388,13 @@ class xBDS12Dataset(tdata.Dataset):
             meta.loc[meta.disaster.isin(TRAIN_DISASTERS), "split"] = "train"
             meta.loc[meta.disaster.isin(TEST_DISASTERS), "split"] = "test"
         else:
+            # full dataset in train split, we can later separate train and valid based on fraction_valid
+            meta["split"] = "train"
             pass
 
         # Keep only the requested split (train/valid/test)
         if self.split in ["train", "valid"]:
-            if self.which_split == "full":
-                # use full training set
-                if self.verbose:
-                    print('Using full training set for "full" which_split')
-                pass
-            else:
-                meta = meta[meta.split == "train"]
+            meta = meta[meta.split == "train"]
 
             if self.fraction_valid > 0:
                 # Stratified train/valid split based on disaster
@@ -428,7 +425,7 @@ class xBDS12Dataset(tdata.Dataset):
 
     def _load_precomputed_stats(self):
         """Load precomputed statistics for normalization (for the correct bands)."""
-        fp_stats = self.DEFAULT_DATASET_FOLDER / "stats" / "normalization.json"
+        fp_stats = self.DEFAULT_DATASET_FOLDER / "normalization.json"
         assert fp_stats.exists(), f"Normalization file {fp_stats} does not exist"
         with open(fp_stats, "r") as f:
             stats = json.load(f)
@@ -505,7 +502,7 @@ class xBDS12Dataset(tdata.Dataset):
 
         return x
 
-    def _get_n_imgs(self, add_predictions: bool = False) -> int:
+    def get_n_imgs(self, add_predictions: bool = False) -> int:
         """Utils for plotting: get the number of images to plot per sample."""
         n_imgs = len(self.modalities) * len(self.periods) + 1  # +1 for the mask
         if add_predictions:
@@ -536,7 +533,7 @@ class xBDS12Dataset(tdata.Dataset):
             mpl.figure.Figure: The figure object containing the plots.
         """
 
-        n_imgs = self._get_n_imgs(add_predictions="predictions" in sample)
+        n_imgs = self.get_n_imgs(add_predictions="predictions" in sample)
 
         if axs is None:
             fig, axs = plt.subplots(1, n_imgs, figsize=(3 * n_imgs, 3))
@@ -617,7 +614,7 @@ if __name__ == "__main__":
     )
 
     print(f"Dataset length: {len(dataset)}")
-    print(f"In channels: {dataset.get_n_channels()}")
+    print(f"In channels: {dataset.get_in_channels()}")
     print(f"Out channels: {dataset.get_out_channels()}")
 
     sample = dataset[0]

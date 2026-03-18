@@ -1,3 +1,5 @@
+"""Utils function for visualization."""
+
 from pathlib import Path
 from typing import Any
 
@@ -10,7 +12,7 @@ import xarray as xr
 from src.constants import CLASSES, CLASSES_ORIGINAL, COLORS, COLORS_ORIGINAL
 
 
-def create_damage_colormap(use_simplified_classes=False):
+def create_damage_colormap(use_simplified_classes: bool = False):
     """Create a custom colormap for damage visualization."""
 
     d_colors = COLORS if use_simplified_classes else COLORS_ORIGINAL

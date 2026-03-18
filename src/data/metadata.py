@@ -1,19 +1,16 @@
 """xBD-S12 metadata"""
 
 import geopandas as gpd
+
 from src.constants import XBD_S12_PATH
 
 
 def load_metadata() -> gpd.GeoDataFrame:
     """
-    Loads the dataframe containing all the metadata for the xBD-S12 dataset.
-
-    The dataframe contains the following columns:
-    TODO: add column descriptions here
-
+    Loads the dataframe containing all the metadata for the xBD-S12 dataset (see DATASET.md for details).
 
     Returns:
-        gpd.GeoDataFrame: The metadata
+        gpd.GeoDataFrame: The metadata with `xbd_uid` as index.
     """
 
     fp = XBD_S12_PATH / "xbd_s12_metadata.geojson"

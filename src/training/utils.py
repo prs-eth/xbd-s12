@@ -1,15 +1,14 @@
 import os
 import random
+from typing import Any, Mapping, Sequence
 
 import numpy as np
 import torch
 import torch.nn.functional as F
-from torchgeo.datasets.utils import _dict_list_to_list_dict
 
 
 def downsample_categorical_mask(mask: torch.Tensor, factor: int, n_labels: int) -> torch.Tensor:
     """Downsample a mask by a factor. Must be a perfect divisor of the mask size otherwise we lose information"""
-    print(f"Downsampling mask from {mask.shape} to {(mask.shape[0]//factor, mask.shape[1]//factor)}" )
     mask_1h = F.one_hot(mask, num_classes=n_labels).permute(2, 0, 1).float()
     mask_down = F.avg_pool2d(mask_1h.unsqueeze(0), kernel_size=factor, stride=factor)
     return mask_down.squeeze(0).argmax(0).long()  # (W//factor, H//factor)
@@ -63,6 +62,14 @@ def apply_buffer_around_buildings(labels: torch.Tensor, buffer: int = 3, nodata_
 
 def unbind_samples(sample):
     """Adapted from torchgeo.datasets.utils.unbind_samples"""
+
+    def _dict_list_to_list_dict(sample: Mapping[Any, Sequence[Any]]) -> list[dict[Any, Any]]:
+        """Convert a dictionary of lists to a list of dictionaries."""
+        uncollated: list[dict[Any, Any]] = [{} for _ in range(max(map(len, sample.values())))]
+        for key, values in sample.items():
+            for i, value in enumerate(values):
+                uncollated[i][key] = value
+        return uncollated
 
     for key, values in sample.items():
         if isinstance(values, torch.Tensor):

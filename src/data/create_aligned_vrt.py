@@ -1,4 +1,4 @@
-hi"""
+"""
 This script corrects xBD raster metadata (CRS and Geotransform) by creating
 lightweight .vrt files. These VRTs point to the original .tif files but
 contain the correct UTM projections and bounds based on the metadata files.
@@ -6,26 +6,26 @@ contain the correct UTM projections and bounds based on the metadata files.
 Warning: If the original .tif files are moved or deleted, the VRTs will break since they reference the original paths.
 
 Usage:
-    python src/data/create_aligned_vrt.py --original_xbd_path /path/to/xbd --num_workers 8
+    python src/data/create_aligned_vrt.py --original_xbd_path /path/to/original_xbd --num_workers 8
 """
 
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
-from typing import Tuple
+from typing import Any
 
-from osgeo import gdal
 import rasterio
+from osgeo import gdal
 from rasterio.crs import CRS
 from rasterio.transform import from_bounds
 from tqdm import tqdm
 
-from src.data.metadata import load_metadata
-from src.utils.time import timeit
-from src.utils.geometry import reproject_geo
 from src.constants import XBD_S12_PATH
+from src.data.metadata import load_metadata
+from src.utils.geometry import reproject_geo
+from src.utils.time import timeit
 
 
-def create_aligned_vrt_file(tif_path: Path, vrt_path: Path, bounds: Tuple[float, float, float, float], crs: str):
+def create_aligned_vrt_file(tif_path: Path, vrt_path: Path, bounds: tuple[float, float, float, float], crs: str) -> None:
     """Creates a VRT file that references a source TIFF but applies new spatial metadata (Bounds and CRS)."""
 
     xmin, ymin, xmax, ymax = bounds
@@ -46,9 +46,18 @@ def create_aligned_vrt_file(tif_path: Path, vrt_path: Path, bounds: Tuple[float,
         ds = None  # Sync to disk and close
 
 
-def process_single_uid(row: dict, original_folder: Path, output_folder: Path, overwrite: bool):
+def process_single_uid(row: dict[str, Any], original_folder: Path, output_folder: Path, overwrite: bool) -> int:
     """
     Process both pre- and post-disaster images for a specific UID from the metadata row.
+
+    Args:
+        row: A dictionary representing a single metadata row (contains geometry, best_utm, etc.).
+        original_folder: Path to the original xBD dataset root.
+        output_folder: Path where the output .vrt files will be saved.
+        overwrite: If True, existing VRT files will be regenerated.
+
+    Returns:
+        The number of VRT tasks successfully queued/processed for this UID.
     """
     uid = row["Index"]
     # Calculate corrected spatial info
@@ -72,9 +81,14 @@ def process_single_uid(row: dict, original_folder: Path, output_folder: Path, ov
 
 
 @timeit
-def create_all_aligned_vrt_files(original_folder: Path, overwrite: bool = False, num_workers: int = 8):
+def create_all_aligned_vrt_files(original_folder: Path, overwrite: bool = False, num_workers: int = 8) -> None:
     """
     Orchestrates the metadata correction process using multiprocessing.
+
+    Args:
+        original_folder: Path to the original xBD dataset root.
+        overwrite: If True, existing VRT files will be regenerated.
+        num_workers: The number of concurrent processes to use.
     """
     output_folder = XBD_S12_PATH / "xbd"
     output_folder.mkdir(exist_ok=True, parents=True)

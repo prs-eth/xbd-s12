@@ -25,9 +25,9 @@ class SiameseUnetLateFusion(nn.Module):
         if kwargs.get("verbose", False):
             print(f"SiameseUnetLateFusion created with final classification layer from {final_channels} to {out_channels} classes.")
 
-        self.initialize()
+        self.initialize_weights()
 
-    def forward(self, x1, x2):
+    def forward(self, x1: torch.Tensor, x2: torch.Tensor) -> torch.Tensor:
         # Forward pass through both U-Nets
         features1 = self.shared_unet(x1, return_features=True)
         features2 = self.shared_unet(x2, return_features=True)
@@ -40,6 +40,6 @@ class SiameseUnetLateFusion(nn.Module):
 
         return output
 
-    def initialize(self):
+    def initialize_weights(self) -> None:
         # Initialize only the final classification layer
         init_weights(self.res)

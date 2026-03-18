@@ -1,3 +1,5 @@
+"""The metrics class used across the project."""
+
 import statistics
 
 import numpy as np
@@ -25,10 +27,10 @@ class xBDS12Metrics:
 
         Args:
             num_dmg_classes (int): Number of damage classes (default: 2 for intact and damaged)
-            dmg_classes_names (list, optional): Names of damage classes for reporting. If None, defaults to ["intact", "damaged"] or generic names.
+            dmg_classes_names (list): Names of damage classes for reporting. If None, defaults to ["intact", "damaged"] or generic names.
             ignore_index (int): Label value to ignore in metrics (default: 99 for no-data)
             localization_only (bool): If True, only compute localization metrics
-            extra_buffer_for_evaluation (int | list[str], optional): Additional buffer(s) to apply around buildings. Metrics with extra buffer(s)
+            extra_buffer_for_evaluation (int | list[str]): Additional buffer(s) to apply around buildings. Metrics with extra buffer(s)
                 will have suffix "_buf{buffer}" in their names.
         """
         self.localization_only = localization_only

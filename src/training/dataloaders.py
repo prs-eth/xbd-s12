@@ -1,4 +1,4 @@
-"""Should contain the logic for creating dataloaders."""
+"""Contains the logic to create the dataloaders."""
 
 import torch.utils.data as tdata
 
@@ -14,7 +14,7 @@ def get_dataloaders(
     batch_size: int = 8,
     num_workers: int = 8,
     fraction_valid: float = 0.15,
-    sampler_train: str = None,
+    sampler_train: str | None = None,
     use_transforms: bool = True,
     pixels_buffer_around_buildings: int = 3,
     **kwargs,
@@ -30,8 +30,8 @@ def get_dataloaders(
         which_split (str): The data split to use, either event, xview2 or full. Defaults to "event".
         batch_size (int): The batch size. Defaults to 8.
         num_workers (int): The number of workers for data loading. Defaults to 8.
-        fraction_valid (float): The fraction of data to use for validation. Defaults to 0.15.
-        sampler_train (str): The sampler to use for training. Can be either 'weighted' or None.Defaults to None.
+        fraction_valid (float): The fraction of data to use for validation. Must be between 0 and 1. Defaults to 0.15.
+        sampler_train (str | None): The sampler to use for training. Can be either 'weighted' or None. Defaults to None.
         use_transforms (bool): Whether to use data augmentation transforms. Defaults to True.
         pixels_buffer_around_buildings (int): The number of pixels to buffer around buildings for training augmentation. Defaults to 3.
         **kwargs: Additional arguments to pass to the dataset.
@@ -43,7 +43,10 @@ def get_dataloaders(
     assert 0 <= fraction_valid < 1, "fraction_valid must be in [0, 1)"
     modalities = [modalities] if isinstance(modalities, str) else modalities
 
-    print(f"Using modalities: {modalities}")
+    print("Creating dataloaders...")
+    print(f"{which_split=}")
+    print(f"{modalities=}")
+    print(f"{task=}")
 
     # For efficient data loading
     dataloaders_kwargs = {
@@ -66,6 +69,8 @@ def get_dataloaders(
         transforms = None
 
     # Create datasets and dataloaders
+
+    # Training dataloader (with augmentation, buffer around buildings, and weighted sampling)
     ds_train = xBDS12Dataset(
         split="train",
         which_split=which_split,
@@ -90,6 +95,7 @@ def get_dataloaders(
         assert sampler_train is None, "sampler_train must be either 'weighted' or None"
         train_loader = tdata.DataLoader(ds_train, shuffle=True, drop_last=True, **dataloaders_kwargs)
 
+    # Validation dataloader
     if fraction_valid > 0:
         ds_valid = xBDS12Dataset(
             split="valid",
@@ -106,6 +112,7 @@ def get_dataloaders(
     else:
         valid_loader = None
 
+    # Test dataloader
     if which_split != "full" or disaster_test is not None:
         ds_test = xBDS12Dataset(
             split="test",
@@ -133,10 +140,10 @@ if __name__ == "__main__":
     # Example usage
     batch_size = 4
     dataloaders = get_dataloaders(
-        modalities=["s1", "s2"],
+        modalities=["s1", "s2_tci", "xbd"],
         task="multiclass",
         which_split="event",
-        batch_size=4,
+        batch_size=batch_size,
         num_workers=4,
         fraction_valid=0.1,
         sampler_train="weighted",

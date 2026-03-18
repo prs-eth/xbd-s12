@@ -2,7 +2,7 @@
 defaults:
   - model: siamese
 
-run_name: ???
+run_name: ??? # Must be set when running the code
 task: multiclass # "multiclass" or "localization"
 extra_buffer_for_evaluation: null # e.g., 2 or [1,2,3]
 num_workers: 8
@@ -33,26 +33,22 @@ data:
   modalities:
     - s1
     - s2
+  fraction_valid: 0.15
   s2_bands: all
   s1_bands: all
-  disaster_train: null
-  disaster_test: null
   downsample_factor: 8 # Always 8 to downsample the origial mask (1024x1024) to 128x128
-  use_simplified_classes: true
-  hdf5_path: default # use "default" to get the default path set in constants.py
+  use_hdf5: false # ues hdf5 instead of loading images from files
+  hdf5_path: null # must be set if use_hdf5 is true
   remove_tiles_without_buildings: false
-  only_pre_disaster: false
-  normalize_data: true
-  fraction_valid: 0.15
   pixels_buffer_around_buildings: 3
 
 # Logging
-logger: wandb
+logger: wandb  # Can be either None (no logging), "local" (only log images to local files) or "wandb" (log to Weights & Biases)
 wandb_project: xbd-s12
 wandb_tags: null
-plot_per_train: null
-plot_per_valid: 3
-plot_per_test: 5
+plot_per_train: null # Number of batches plotted during each epoch for training. Set to null to disable plotting during training.
+plot_per_valid: 3 # Same for validation.
+plot_per_test: 5 # Same for test.
 
 
 

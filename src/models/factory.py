@@ -9,7 +9,7 @@ def model_factory(model_name: str, **model_kwargs) -> nn.Module:
     Factory function to create a model instance.
 
     Args:
-        model_name (str): The name of the model to create.
+        model_name: The name of the model to create.
         **model_kwargs: Additional keyword arguments to pass to the model constructor.
 
     Returns:

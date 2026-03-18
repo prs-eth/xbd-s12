@@ -1,4 +1,12 @@
+"""Script containing all constants used across the project."""
+
+# Fix PROJ_LIB path
+import os
 from pathlib import Path
+
+import pyproj
+
+os.environ["PROJ_LIB"] = pyproj.datadir.get_data_dir()
 
 # ------------------- PATH CONSTANTS -------------------
 constants_path = Path(__file__)
@@ -6,7 +14,6 @@ SRC_PATH = constants_path.parent
 PROJECT_PATH = SRC_PATH.parent
 DATA_PATH = PROJECT_PATH / "data"
 XBD_S12_PATH = DATA_PATH / "xbd_s12"
-PROCESSED_PATH = DATA_PATH / "processed"
 HYDRA_CONFIG_PATH = SRC_PATH / "configs"
 LOGS_PATH = PROJECT_PATH / "logs"
 

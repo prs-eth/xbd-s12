@@ -1,7 +1,9 @@
 import time
 
 
-def timeit(func):
+def timeit(func: callable) -> callable:
+    """Utils decorator to measure and print execution time of an arbitrary function."""
+
     def wrapper(*args, **kwargs):
         start = time.time()
         result = func(*args, **kwargs)

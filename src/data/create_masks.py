@@ -1,13 +1,21 @@
-from src.utils.time import timeit
-from src.constants import XBD_S12_PATH
-from pathlib import Path
-from src.data.metadata import load_metadata
+"""
+This script processes the xBD JSON label files to generate corresponding masks and saves
+them as GeoTIFFs. The damage classes are encoded as integer values, see DAMAGE_DICT.
+"""
+
 import json
-import numpy as np
-from shapely.wkt import loads as wkt_loads
-import rioxarray as rxr
+from pathlib import Path
+from typing import Any
+
 import cv2
+import numpy as np
+import rioxarray as rxr
+from shapely.wkt import loads as wkt_loads
 from tqdm import tqdm
+
+from src.constants import XBD_S12_PATH
+from src.data.metadata import load_metadata
+from src.utils.time import timeit
 
 # Mapping from original class names to integer labels
 DAMAGE_DICT = {
@@ -20,8 +28,15 @@ DAMAGE_DICT = {
 
 
 @timeit
-def create_all_masks(original_folder: Path, overwrite: bool = False, nodata_value: int = 6):
+def create_all_masks(original_folder: Path, overwrite: bool = False, nodata_value: int = 6) -> None:
+    """
+    Orchestrates the creation of raster masks for all entries in the metadata.
 
+    Args:
+        original_folder: Path to the root of the original xBD dataset.
+        overwrite: If True, regenerates existing masks.
+        nodata_value: The integer value representing nodata pixels.
+    """
     folder = XBD_S12_PATH / "masks"
     folder.mkdir(exist_ok=True, parents=True)
     df_meta = load_metadata()
@@ -40,16 +55,29 @@ def create_all_masks(original_folder: Path, overwrite: bool = False, nodata_valu
         create_raster_mask(json_fp, out_fp, nodata_value=nodata_value)
 
 
-def create_raster_mask(json_path: Path, out_fp: Path, nodata_value: int = 6):
-    # adapted from https://github.com/PaulBorneP/Xview2_Strong_Baseline/blob/master/legacy/create_masks.py
+def create_raster_mask(json_path: Path, out_fp: Path, nodata_value: int = 6) -> None:
+    """
+    Parses a JSON label file to generate a rasterized mask of building damage.
 
-    # Load the json file and transform to a 1024x1024 mask
-    data = json.load(open(json_path))
+    Adapted from https://github.com/PaulBorneP/Xview2_Strong_Baseline/blob/master/legacy/create_masks.py
+
+
+    Args:
+        json_path: Path to the post-disaster JSON label file.
+        out_fp: Path where the resulting GeoTIFF mask will be saved.
+        nodata_value: The integer value to assign to nodata regions.
+    """
+    # Load the json file and transform to a 1024x1024 mask safely
+    with open(json_path) as f:
+        data = json.load(f)
+
     mask = np.zeros((1024, 1024), dtype="uint8")
     for feat in data["features"]["xy"]:
         poly = wkt_loads(feat["wkt"])
         subtype = feat["properties"]["subtype"]
         _mask = mask_for_polygon(poly)
+
+        # Apply damage class to the masked polygon area
         mask[_mask > 0] = DAMAGE_DICT[subtype]
 
     # Add nodata based on xBD images (eg if the original image is cut)
@@ -67,6 +95,7 @@ def create_raster_mask(json_path: Path, out_fp: Path, nodata_value: int = 6):
     # Use one of the images to get the geotransform and crs
     raster = img_post[0]
     raster.rio.set_nodata(0)
+    # Apply the nodata value where applicable, otherwise keep the parsed mask
     raster.values = np.where(mask_nodata, nodata_value, mask)
 
     # Save mask
@@ -74,16 +103,28 @@ def create_raster_mask(json_path: Path, out_fp: Path, nodata_value: int = 6):
     raster.rio.to_raster(out_fp, compress="zstd")
 
 
-def mask_for_polygon(poly, im_size=(1024, 1024)):
+def mask_for_polygon(poly: Any, im_size: tuple[int, int] = (1024, 1024)) -> np.ndarray:
+    """
+    Converts a Shapely polygon into a 2D binary numpy mask using OpenCV.
+
+    Args:
+        poly: A Shapely polygon object.
+        im_size: The dimensions of the output mask.
+
+    Returns:
+        A 2D numpy array representing the binary mask of the polygon.
+    """
     img_mask = np.zeros(im_size, np.uint8)
 
-    def int_coords(x):
+    def int_coords(x: Any) -> np.ndarray:
         return np.array(x).round().astype(np.int32)
 
     exteriors = [int_coords(poly.exterior.coords)]
     interiors = [int_coords(pi.coords) for pi in poly.interiors]
+
     cv2.fillPoly(img_mask, exteriors, 1)
     cv2.fillPoly(img_mask, interiors, 0)
+
     return img_mask
 
 
