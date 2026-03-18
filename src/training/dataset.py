@@ -186,8 +186,7 @@ class xBDS12Dataset(tdata.Dataset):
         # Load metadata
         self.meta = self._load_metadata()
         if self.verbose:
-            print(f'Using the "{which_split}" split')
-            print(f"Loaded {len(self.meta)} samples for {self.split}")
+            print(f"Loaded {len(self.meta)} samples for {self.split}.")
 
         # Load precomputed statistics for normalization
         if self.normalize_data:
@@ -505,7 +504,7 @@ class xBDS12Dataset(tdata.Dataset):
 
         return x
 
-    def _get_n_imgs(self, add_predictions: bool = False) -> int:
+    def get_n_imgs(self, add_predictions: bool = False) -> int:
         """Utils for plotting: get the number of images to plot per sample."""
         n_imgs = len(self.modalities) * len(self.periods) + 1  # +1 for the mask
         if add_predictions:
@@ -536,7 +535,7 @@ class xBDS12Dataset(tdata.Dataset):
             mpl.figure.Figure: The figure object containing the plots.
         """
 
-        n_imgs = self._get_n_imgs(add_predictions="predictions" in sample)
+        n_imgs = self.get_n_imgs(add_predictions="predictions" in sample)
 
         if axs is None:
             fig, axs = plt.subplots(1, n_imgs, figsize=(3 * n_imgs, 3))
