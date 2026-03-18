@@ -62,7 +62,7 @@ python src/data/create_masks.py --original_xbd_path='data/original_xbd'
 
 
 
-The final dataset structure should look like this:
+The final dataset structure should look like this: 
 
 ```
 data/
