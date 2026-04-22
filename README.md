@@ -99,7 +99,7 @@ preds = inferor.infer(
 )
 ```
 
-For a complete example, including how to download and prepare Sentinel data, please refer to the notebook [inference_palisades_wildfire_2025.ipynb](notebooks/inference_palisades_wildfire_2025.ipynb).
+For a complete example, including how to download and prepare Sentinel data, please refer to the notebook [inference_palisades_wildfires.ipynb](notebooks/inference_palisades_wildfires.ipynb).
 
 
 
