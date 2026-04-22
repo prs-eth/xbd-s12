@@ -1,0 +1,48 @@
+# Ignore Python cache & virtual envs
+__pycache__/
+*.pyc
+*.pyo
+xbds12-env
+.venv
+.ruff_cache
+
+# Ignore logs & temp files
+*.log
+*.tmp
+*.out
+
+# Ignore data
+data/*
+!data/.gitkeep
+!src/data
+
+# Ignore logs
+logs/
+
+
+# Ignore common large or raw file types
+.ipynb_checkpoints
+*.csv
+*.json
+*.zip
+*.h5
+*.pth
+*.ckpt
+*.png
+*.tif
+*.jpg
+*.jpeg
+*.pt
+*egg-info
+!docs/*
+
+# Ignore IDE & OS-specific files
+.DS_Store
+.vscode/
+.idea/
+
+# Ignore credentials file
+.s5cfg
+
+# files used to export models on HuggingFace Hub
+hf_hub

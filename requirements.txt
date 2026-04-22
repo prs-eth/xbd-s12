@@ -1,0 +1,16 @@
+h5py==3.15.1
+ipykernel==6.29.5
+opencv-python==4.13.0.92
+rioxarray==0.20.0
+segmentation-models-pytorch==0.5.0
+torch==2.9.1
+torchvision==0.24.1
+tqdm==4.67.1
+wandb==0.23.0
+
+# Formatting and linting for development
+black==25.11.0
+flake8==7.3.0
+isort==7.0.0
+
+-e . # The source code of the project defined in pyproject.toml (src)
